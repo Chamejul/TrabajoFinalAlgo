@@ -1,6 +1,210 @@
 <code>  </code>"title"<b>:</b><code> </code>"Buscar Errores"
 <code>  </code>"title"<b>:</b><code> </code>"Implementar el arbol Avl
-"
+#pragma once
+#include <iostream>
+#include <string>
+using namespace std;
+class Archives {
+private:
+	string name;
+	float weight;
+	string extension;
+	int date;
+public:
+	Archives(string name, float weight, string extension, int date) { 
+		this->name = name; 
+		this->weight = weight; 
+		this->extension = extension; 
+		this->date = date; 
+	}
+	string getname() { return name; }
+	float getweight() { return weight; }
+	int getfecha() { return date; }
+	string getextension() { return extension; }
+
+};
+#pragma once
+#include <iostream>
+#include <fstream>
+#include <dirent.h>
+#include <stdio.h>
+#include "Archivo.h"
+#include "Nodo.h"
+template <class T, class P, class C> // P para funcion procesar y C para funcion comparar
+class ArbolAVL {
+	struct Nodo {
+		T elem; // payload
+		Nodo* izq;
+		Nodo* der;
+		int h; // altura: numero de ramas desde el nodo hasta la hoja más lejana
+
+		Nodo(T elem = 0, Nodo* izq = nullptr, Nodo* der = nullptr, int h = 0)
+			: elem(elem), izq(izq), der(der), h(h) {}
+	};
+
+	Nodo* raiz;
+	P procesar; // templates de punteros a funciones o lambdas
+	C comparar; // templates de punteros a funciones o lambdas
+
+	Nodo* dummynull = nullptr;
+public:
+	ArbolAVL(P procesar, C comparar)
+		: procesar(procesar), comparar(comparar), raiz(nullptr) {}
+	bool insertar(T e) {
+		return _insertar(raiz, e);
+	}
+	void enOrden() {
+		_enOrden(raiz);
+	}
+	int altura() {
+		_altura(raiz);
+	}
+	T buscar(T e) {
+		return _buscar(raiz, e);
+	}
+	bool eliminar(T e) {
+		Nodo*& nodo = _encontrar(raiz, e);
+		if (nodo == nullptr) return false;
+		Nodo* reemplazo = _encontrarReemplazo(nodo);
+		if (reemplazo == nullptr) {
+			delete nodo;
+			nodo = nullptr;
+		}
+		else {
+			reemplazo->izq = nodo->izq;
+			reemplazo->der = nodo->der;
+			Nodo* temp = nodo;
+			nodo = reemplazo;
+			delete temp;
+		}
+		return true;
+	}
+
+private:
+	bool igualA(T a, T b) { return comparar(a, b) == 0; }
+	bool menorQue(T a, T b) { return comparar(a, b) < 0; }
+	bool menorIgualQue(T a, T b) { return comparar(a, b) <= 0; }
+	bool mayorQue(T a, T b) { return comparar(a, b) > 0; }
+	bool mayorIgualQue(T a, T b) { return comparar(a, b) >= 0; }
+
+	void _rotarIzq(Nodo*& x, Nodo* y) { // p es el padre de x
+		Nodo* temp = x;
+		x = y;
+		temp->der = y->izq;
+		y->izq = temp;
+	}
+	void _rotarDer(Nodo*  x, Nodo*& y) { // p es el padre de y
+		Nodo* temp = y;
+		y = x;
+		temp->izq = x->der;
+		x->der = temp;
+	}
+	int _altura(Nodo* nodo) {
+		if (nodo == nullptr) return -1;
+		return nodo->h; // implementacion optima en tiempo
+	}
+
+	bool _insertar(Nodo*& nodo, T e) {
+		if (nodo == nullptr) {
+			nodo = new Nodo(); // h = 0
+			nodo->elem = e;
+		}
+		else if (menorIgualQue(e, nodo->elem)) { // menorQue no permite duplicados a la izquierda
+			_insertar(nodo->izq, e);
+		}
+		else /* if (mayorQue(e, nodo->elem)) */ { // descomentar para no aceptar duplicados
+			_insertar(nodo->der, e);
+		}
+		int hi = _altura(nodo->izq);
+		int hd = _altura(nodo->der);
+		int d = hd - hi;
+		if (d > 1) { // pesado a la derecha
+			int hni = _altura(nodo->der->izq);
+			int hnd = _altura(nodo->der->der);
+			if (hni > hnd) { // zig zag derecha izquierda
+				_rotarDer(nodo->der->izq, nodo->der);
+			}
+			_rotarIzq(nodo, nodo->der);
+		}
+		else if (d < -1) { // pesado a la izquierda
+			int hni = _altura(nodo->izq->izq);
+			int hnd = _altura(nodo->izq->der);
+			if (hnd > hni) { // zig zag izquierda derecha
+				_rotarIzq(nodo->izq, nodo->izq->der);
+			}
+			_rotarDer(nodo->izq, nodo);
+		}
+		hi = _altura(nodo->izq);
+		hd = _altura(nodo->der);
+		nodo->h = 1 + (hi > hd ? hi : hd);
+		return true;
+	}
+
+	void _enOrden(Nodo* nodo) {
+		if (nodo == nullptr) return;
+		_enOrden(nodo->izq);
+		procesar(nodo->elemento);
+		_enOrden(nodo->der);
+	}
+
+	T _buscar(Nodo* nodo, T e) { // template funcional
+		if (nodo == nullptr) return 0;
+		if (igualA(e, nodo->elem)) {
+			return nodo->elem;
+		}
+		else {
+			return _buscar(
+				mayorQue(e, nodo->elem) ? nodo->der : nodo->izq, e);
+		}
+	}
+	Nodo* _extraerMayor(Nodo*& nodo) {
+		if (nodo == nullptr) return nullptr;
+		if (nodo->der == nullptr) {
+			Nodo* temp = nodo;
+			nodo = nodo->izq;
+			temp->izq = nullptr;
+			return temp;
+		}
+		else {
+			return _extraerMayor(nodo->der);
+		}
+	}
+	Nodo* _extraerMenor(Nodo*& nodo) {
+		if (nodo == nullptr) return nullptr;
+		if (nodo->izq == nullptr) {
+			Nodo* temp = nodo;
+			nodo = nodo->der;
+			temp->der = nullptr;
+			return temp;
+		}
+		else {
+			return _extraerMenor(nodo->izq);
+		}
+	}
+	Nodo*& _encontrar(Nodo*& nñodo, T e) { // template funcional
+		if (nodo == nullptr) return dummynull;
+		if (igualA(e, nodo->elem)) {
+			return nodo;
+		}
+		else {
+			return _encontrar(menorQue(e, nodo->elem) ? nodo->izq : nodo->der, e);
+		}
+	}
+	Nodo* _encontrarReemplazo(Nodo*& nodo) {
+		Nodo* reemp = _extraerMayor(nodo->izq);
+		if (reemp == nullptr) {
+			reemp = _extraerMenor(nodo->der);
+		}
+		return reemp;
+	}
+};
+
+
+
+
+
+
+
 
 
 
